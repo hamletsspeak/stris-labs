@@ -1,0 +1,367 @@
+openapi: 3.0.3
+info:
+  title: Social Network API
+  version: 1.0.0
+  description: API for managing users, friendships, and posts.
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: Users
+  - name: Friends
+  - name: Posts
+
+paths:
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: Get user profile
+      operationId: getUserProfile
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      responses:
+        "200":
+          description: User profile returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /users/{userId}/friends:
+    post:
+      tags: [Friends]
+      summary: Add friend
+      operationId: addFriend
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddFriendRequest"
+      responses:
+        "201":
+          description: Friendship created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Friendship"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+    get:
+      tags: [Friends]
+      summary: Get user friends list
+      operationId: getFriends
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/OffsetQuery"
+      responses:
+        "200":
+          description: Friends list returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FriendsListResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /users/{userId}/friends/{friendId}:
+    delete:
+      tags: [Friends]
+      summary: Remove friend
+      operationId: removeFriend
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+        - $ref: "#/components/parameters/FriendIdPath"
+      responses:
+        "204":
+          description: Friendship deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /users/{userId}/posts:
+    post:
+      tags: [Posts]
+      summary: Publish post to feed
+      operationId: publishPost
+      parameters:
+        - $ref: "#/components/parameters/UserIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostRequest"
+      responses:
+        "201":
+          description: Post created
+          headers:
+            Location:
+              description: URL of created post
+              schema:
+                type: string
+                example: /api/v1/posts/b97321f7-2661-4dbf-8c8b-642404ac7172
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  parameters:
+    UserIdPath:
+      name: userId
+      in: path
+      required: true
+      description: User identifier
+      schema:
+        type: string
+        format: uuid
+    FriendIdPath:
+      name: friendId
+      in: path
+      required: true
+      description: Friend user identifier
+      schema:
+        type: string
+        format: uuid
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    OffsetQuery:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+  responses:
+    BadRequest:
+      description: Invalid input data
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            invalidInput:
+              value:
+                error:
+                  code: BAD_REQUEST
+                  message: Invalid request payload
+                  details: content must not be empty
+    NotFound:
+      description: Entity not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            notFound:
+              value:
+                error:
+                  code: NOT_FOUND
+                  message: Requested resource was not found
+                  details: null
+    Conflict:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            alreadyFriends:
+              value:
+                error:
+                  code: FRIENDSHIP_ALREADY_EXISTS
+                  message: Friendship already exists
+                  details: null
+
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - username
+        - firstName
+        - lastName
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+        firstName:
+          type: string
+          maxLength: 100
+        lastName:
+          type: string
+          maxLength: 100
+        bio:
+          type: string
+          nullable: true
+          maxLength: 1000
+        avatarUrl:
+          type: string
+          format: uri
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AddFriendRequest:
+      type: object
+      required:
+        - friendId
+      properties:
+        friendId:
+          type: string
+          format: uuid
+
+    Friendship:
+      type: object
+      required:
+        - id
+        - userId
+        - friendId
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        friendId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [accepted]
+        createdAt:
+          type: string
+          format: date-time
+
+    FriendListItem:
+      type: object
+      required:
+        - id
+        - username
+        - firstName
+        - lastName
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+          nullable: true
+
+    FriendsListResponse:
+      type: object
+      required:
+        - items
+        - total
+        - limit
+        - offset
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FriendListItem"
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        offset:
+          type: integer
+          minimum: 0
+
+    CreatePostRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        visibility:
+          type: string
+          enum: [friends, public]
+          default: friends
+
+    Post:
+      type: object
+      required:
+        - id
+        - authorId
+        - content
+        - visibility
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        authorId:
+          type: string
+          format: uuid
+        content:
+          type: string
+        visibility:
+          type: string
+          enum: [friends, public]
+        createdAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              nullable: true

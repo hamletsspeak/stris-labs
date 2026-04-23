@@ -1,0 +1,77 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: lab5-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: "2181"
+      ZOOKEEPER_TICK_TIME: "2000"
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: lab5-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: "1"
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/bin/kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  consumer-1:
+    build: ./app
+    container_name: lab5-consumer-1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      TOPIC_NAME: transactions
+      GROUP_ID: transaction-group
+      CONSUMER_NAME: consumer-1
+      MAX_MESSAGES: "10"
+    command: ["python", "consumer.py"]
+
+  consumer-2:
+    build: ./app
+    container_name: lab5-consumer-2
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      TOPIC_NAME: transactions
+      GROUP_ID: transaction-group
+      CONSUMER_NAME: consumer-2
+      MAX_MESSAGES: "10"
+    command: ["python", "consumer.py"]
+
+  producer:
+    build: ./app
+    container_name: lab5-producer
+    depends_on:
+      kafka:
+        condition: service_healthy
+      consumer-1:
+        condition: service_started
+      consumer-2:
+        condition: service_started
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      TOPIC_NAME: transactions
+      TOPIC_PARTITIONS: "3"
+      TOPIC_REPLICATION_FACTOR: "1"
+    command: ["python", "producer.py"]
