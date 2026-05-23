@@ -18,25 +18,25 @@ docker compose up --build -d
 ```
 
 ## Проверка части 1 и 2
-```bash
-curl http://localhost:8081/info
-curl http://localhost:8082/info
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8081/info"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8082/info"
 ```
 В ответах должно отличаться поле `service`.
 
 ## Проверка части 3 и 4 (Round Robin + Reverse Proxy)
-```bash
-curl http://localhost:8080/info
-curl http://localhost:8080/info
-curl http://localhost:8080/info
-curl http://localhost:8080/info
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/info"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/info"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/info"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/info"
 ```
 Сервисы в поле `service` должны чередоваться (`service-1`, `service-2`, ...).
 
 ## Проверка части 5 (кэш)
-```bash
-curl "http://localhost:8080/data?id=1"
-curl "http://localhost:8080/data?id=1"
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/data?id=1"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/data?id=1"
 ```
 Ожидаемо:
 - первый ответ: `source = generated`

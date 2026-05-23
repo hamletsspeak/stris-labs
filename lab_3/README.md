@@ -40,24 +40,24 @@ docker compose up --build -d
 ```
 
 Проверка здоровья:
-```bash
-curl http://localhost:8080/health
-curl http://localhost:8081/health
-curl http://localhost:8082/health
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/health"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8081/health"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8082/health"
 ```
 
 ## Задание 1: простая репликация
 
 1. Записать данные через master:
-```bash
-curl -X POST "http://localhost:8080/data?key=name&value=Alice"
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://localhost:8080/data?key=name&value=Alice"
 ```
 
 2. Прочитать на master и репликах:
-```bash
-curl http://localhost:8080/data/name
-curl http://localhost:8081/data/name
-curl http://localhost:8082/data/name
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/data/name"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8081/data/name"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8082/data/name"
 ```
 
 Ожидаемо: значение `Alice` есть на всех трех узлах.
@@ -70,14 +70,14 @@ docker compose stop replica1
 ```
 
 2. Выполнить запись через master, пока `replica1` отключена:
-```bash
-curl -X POST "http://localhost:8080/data?key=city&value=Moscow"
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://localhost:8080/data?key=city&value=Moscow"
 ```
 
 3. Проверить данные:
-```bash
-curl http://localhost:8080/data/city
-curl http://localhost:8082/data/city
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/data/city"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8082/data/city"
 ```
 
 4. Включить `replica1` обратно:
@@ -86,10 +86,10 @@ docker compose start replica1
 ```
 
 5. Сравнить состояние после восстановления:
-```bash
-curl http://localhost:8081/data/city
-curl http://localhost:8082/data/city
-curl http://localhost:8080/data/city
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8081/data/city"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8082/data/city"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/data/city"
 ```
 
 Ожидаемо:

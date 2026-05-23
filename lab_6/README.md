@@ -98,35 +98,35 @@ API gateway: `http://localhost:8080`
 
 1. Создать заказ:
 
-```bash
-curl -X POST http://localhost:8080/api/orders \
-  -H "Content-Type: application/json" \
-  -H "Idempotency-Key: demo-001" \
-  -d '{"user_id": 101, "amount": 1200.50}'
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/orders" `
+  -ContentType "application/json" `
+  -Headers @{ "Idempotency-Key" = "demo-001" } `
+  -Body '{"user_id": 101, "amount": 1200.50}'
 ```
 
 2. Polling статуса:
 
-```bash
-curl http://localhost:8080/api/orders/<ORDER_ID>/status
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/orders/<ORDER_ID>/status"
 ```
 
 3. Long Polling:
 
-```bash
-curl "http://localhost:8080/api/orders/<ORDER_ID>/status/long-poll?current_status=PENDING&timeout_seconds=20"
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/orders/<ORDER_ID>/status/long-poll?current_status=PENDING&timeout_seconds=20"
 ```
 
 4. Streaming (SSE):
 
-```bash
-curl -N http://localhost:8080/api/orders/<ORDER_ID>/status/stream
+```powershell
+Invoke-WebRequest -Uri "http://localhost:8080/api/orders/<ORDER_ID>/status/stream"
 ```
 
 5. Проверка сервис-дискавери и heartbeat:
 
-```bash
-curl http://localhost:8500/services
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8500/services"
 ```
 
 6. Проверка событий Pub/Sub:

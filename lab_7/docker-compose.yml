@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: lab7-postgres
+    environment:
+      POSTGRES_DB: outbox_demo
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+    ports:
+      - "5438:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d outbox_demo"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: lab7-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./app
+    container_name: lab7-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: outbox_demo
+      DB_USER: demo
+      DB_PASSWORD: demo
+      APP_ROLE: api
+    ports:
+      - "8087:8080"
+
+  outbox-relay:
+    build: ./app
+    container_name: lab7-outbox-relay
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: outbox_demo
+      DB_USER: demo
+      DB_PASSWORD: demo
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      OUTBOX_QUEUE: orders.events
+      APP_ROLE: relay
+
+  consumer:
+    build: ./app
+    container_name: lab7-consumer
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      OUTBOX_QUEUE: orders.events
+      APP_ROLE: consumer

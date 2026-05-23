@@ -1,0 +1,42 @@
+﻿flowchart LR
+    P[Passenger App] --> GW[API Gateway]
+    D[Driver App] --> GW
+
+    GW --> AUTH[Auth Service]
+    GW --> RIDE[Ride Service]
+    GW --> DRIVER[Driver Service]
+    GW --> TRACK[Tracking API]
+
+    D --> LOC[Location Ingest Service]
+    P --> LOC
+
+    LOC --> KAFKA[(Kafka / Event Bus)]
+    LOC --> GEO[(Redis GEO / In-memory Geo Index)]
+
+    RIDE --> MATCH[Matching Service]
+    MATCH --> GEO
+    MATCH --> DRIVER
+    MATCH --> OFFER[Offer Service]
+    OFFER --> PUSH[Push / WebSocket Notifications]
+    PUSH --> D
+    PUSH --> P
+
+    D --> OFFER
+    OFFER --> RIDE
+
+    RIDE --> TRIPDB[(Trips DB: PostgreSQL / Cassandra)]
+    DRIVER --> DRIVERDB[(Drivers DB)]
+    AUTH --> USERDB[(Users DB)]
+
+    KAFKA --> TRACK
+    TRACK --> ACTIVE[(Active Trips Cache)]
+    TRACK --> P
+    TRACK --> D
+
+    RIDE --> HIST[History Service]
+    HIST --> TRIPDB
+
+    RIDE --> PAY[Payment Service]
+    PAY --> PAYDB[(Payments DB)]
+
+    KAFKA --> ANALYTICS[(Analytics / Cold Storage)]

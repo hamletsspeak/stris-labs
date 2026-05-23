@@ -24,48 +24,46 @@
 
 `GET /users/{userId}`
 
-```bash
-curl -X GET "http://localhost:8080/api/v1/users/af1f0f3b-8e90-4c8f-87a6-2a46db2a53f1" \
-  -H "Accept: application/json"
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/v1/users/af1f0f3b-8e90-4c8f-87a6-2a46db2a53f1" `
+  -Headers @{ Accept = "application/json" }
 ```
 
 ### 2) Добавление друга
 
 `POST /users/{userId}/friends`
 
-```bash
-curl -X POST "http://localhost:8080/api/v1/users/af1f0f3b-8e90-4c8f-87a6-2a46db2a53f1/friends" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "friendId": "8d81b7ad-5f4d-474f-b2a9-5f8d39cf6f6e"
-  }'
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/v1/users/af1f0f3b-8e90-4c8f-87a6-2a46db2a53f1/friends" `
+  -ContentType "application/json" `
+  -Body '{"friendId":"8d81b7ad-5f4d-474f-b2a9-5f8d39cf6f6e"}'
 ```
 
 ### 3) Удаление друга
 
 `DELETE /users/{userId}/friends/{friendId}`
 
-```bash
-curl -X DELETE "http://localhost:8080/api/v1/users/af1f0f3b-8e90-4c8f-87a6-2a46db2a53f1/friends/8d81b7ad-5f4d-474f-b2a9-5f8d39cf6f6e"
+```powershell
+Invoke-RestMethod -Method Delete -Uri "http://localhost:8080/api/v1/users/af1f0f3b-8e90-4c8f-87a6-2a46db2a53f1/friends/8d81b7ad-5f4d-474f-b2a9-5f8d39cf6f6e"
 ```
 
 ### 4) Просмотр списка друзей
 
 `GET /users/{userId}/friends?limit=20&offset=0`
 
-```bash
-curl -X GET "http://localhost:8080/api/v1/users/af1f0f3b-8e90-4c8f-87a6-2a46db2a53f1/friends?limit=20&offset=0" \
-  -H "Accept: application/json"
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/v1/users/af1f0f3b-8e90-4c8f-87a6-2a46db2a53f1/friends?limit=20&offset=0" `
+  -Headers @{ Accept = "application/json" }
 ```
 
 ### 5) Публикация поста
 
 `POST /users/{userId}/posts`
 
-```bash
-curl -X POST "http://localhost:8080/api/v1/users/af1f0f3b-8e90-4c8f-87a6-2a46db2a53f1/posts" \
-  -H "Content-Type: application/json" \
-  -d '{
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://localhost:8080/api/v1/users/af1f0f3b-8e90-4c8f-87a6-2a46db2a53f1/posts" `
+  -ContentType "application/json" `
+  -Body '{
     "content": "Сегодня отличный день для релиза!",
     "visibility": "friends"
   }'
