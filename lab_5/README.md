@@ -1,66 +1,106 @@
 # Лабораторная работа 5
 
-Тема: Kafka (topic, partitioning, producer/consumer group, JSON сериализация/десериализация).
+## Kafka: topic, partitions, producer и consumer group
 
-## Что реализовано
+Эта лабораторная работа показывает обмен сообщениями через Kafka. Producer отправляет JSON-сообщения о транзакциях в topic `transactions`, а два consumer-а читают их в одной consumer group.
 
-- `zookeeper` + `kafka` в `docker-compose`.
-- Topic `transactions` создается автоматически producer-ом:
-  - `3` партиции,
-  - `replication_factor=1`.
-- Формат сообщений: JSON.
-- Поля сообщения: `user_id`, `amount`, `type` (`incoming`/`outgoing`).
-- Ключ сообщения: `user_id` (строка).  
-  Это гарантирует, что одинаковый `user_id` всегда попадает в одну и ту же партицию.
-- 2 consumer-а в одной `consumer group`: `transaction-group`.
+## Что запускается
 
-## Состав
+- `lab5-zookeeper` - Zookeeper для Kafka.
+- `lab5-kafka` - Kafka broker.
+- `lab5-producer` - отправляет сообщения.
+- `lab5-consumer-1` - первый consumer.
+- `lab5-consumer-2` - второй consumer.
 
-- `docker-compose.yml`
-- `app/Dockerfile`
-- `app/requirements.txt`
-- `app/common.py`
-- `app/producer.py`
-- `app/consumer.py`
+## Что делает producer
+
+Producer создает topic `transactions` с параметрами:
+
+- `3` partition;
+- `replication_factor=1`.
+
+Затем он отправляет JSON-сообщения с полями:
+
+```json
+{
+  "user_id": 101,
+  "amount": 500,
+  "type": "incoming"
+}
+```
+
+Ключ сообщения - `user_id`. Это важно: Kafka отправляет сообщения с одинаковым ключом в одну и ту же partition. Поэтому события одного пользователя сохраняют порядок внутри своей partition.
+
+## Что делают consumers
+
+Два consumer-а работают в одной группе:
+
+```text
+transaction-group
+```
+
+Kafka распределяет partitions между consumer-ами внутри группы. Одно сообщение обрабатывается только одним consumer-ом этой группы, поэтому дублирования обработки внутри группы нет.
+
+## Состав файлов
+
+- `docker-compose.yml` - Kafka, Zookeeper, producer и consumers.
+- `app/common.py` - общие настройки и сериализация.
+- `app/producer.py` - создание topic и отправка сообщений.
+- `app/consumer.py` - чтение сообщений.
+- `app/Dockerfile` и `app/requirements.txt` - сборка Python-контейнера.
 
 ## Запуск
+
+Из папки `lab_5`:
 
 ```bash
 docker compose up --build
 ```
 
-## Что проверить в логах
+## Что смотреть в логах
 
-1. В логах `producer` видно, в какую партицию ушло каждое сообщение:
-```text
-user_id=101 ... -> partition=...
-user_id=101 ... -> partition=...
-```
-Для одного и того же `user_id` партиция должна совпадать.
+Логи producer-а:
 
-2. Для других `user_id` партиции могут отличаться:
-```text
-user_id=202 ... -> partition=...
-user_id=303 ... -> partition=...
+```bash
+docker compose logs -f producer
 ```
 
-3. В логах `consumer-1` и `consumer-2` видно чтение из топика `transactions` в группе `transaction-group`:
-- Kafka сама распределяет партиции между consumer-ами внутри одной группы.
-- Сообщение читается только одним consumer-ом группы (без дублей внутри группы).
+В них видно, в какую partition ушло каждое сообщение. Для одинакового `user_id` partition должна совпадать.
 
-## Полезные команды
+Логи consumer-ов:
 
-Показать логи:
+```bash
+docker compose logs -f consumer-1 consumer-2
+```
+
+В них видно, что сообщения распределяются между двумя consumer-ами. Каждый consumer получает только часть partitions.
+
+Можно смотреть все сразу:
+
 ```bash
 docker compose logs -f producer consumer-1 consumer-2
 ```
 
-Остановить:
+## Что должно получиться
+
+- topic `transactions` создается автоматически;
+- сообщения отправляются в Kafka в JSON-формате;
+- одинаковые `user_id` попадают в одну partition;
+- два consumer-а делят partitions между собой;
+- сообщение внутри одной consumer group обрабатывается одним consumer-ом.
+
+## Остановка
+
 ```bash
 docker compose down
 ```
 
-Остановить и удалить данные:
+Остановить и удалить данные Kafka:
+
 ```bash
 docker compose down -v
 ```
+
+## Итог
+
+Лабораторная показывает, зачем в Kafka нужны partitions, как ключ сообщения влияет на распределение, и как consumer group позволяет параллельно обрабатывать поток без дублирования внутри группы.

@@ -1,109 +1,149 @@
 # Лабораторная работа 3
 
-Тема: распределенное хранение данных (простая репликация в памяти).
+## Простая репликация данных
 
-## Что реализовано
+В этой лабораторной работе реализована минимальная модель распределенного key-value хранилища. Есть один master-узел и две replica-ноды. Данные хранятся в памяти процесса, без базы данных.
 
-3 узла в `docker-compose`:
-- `master` (Node A) на `localhost:8080`
-- `replica1` (Node B) на `localhost:8081`
-- `replica2` (Node C) на `localhost:8082`
+Цель работы - показать, как master принимает запись, рассылает ее репликам и что происходит, если одна из реплик была недоступна.
 
-Поведение:
-- `master` принимает запись (`POST /data`) и рассылает ее на реплики (`POST /replica/data`).
-- Все данные хранятся в памяти процесса каждого узла.
-- `replica` хранит только пришедшие от `master` данные.
+## Что запускается
+
+- `lab3-master` - master-узел, доступен на `localhost:8080`.
+- `lab3-replica1` - первая реплика, доступна на `localhost:8081`.
+- `lab3-replica2` - вторая реплика, доступна на `localhost:8082`.
+
+Все три контейнера запускают один и тот же Flask-код. Роль узла задается переменной окружения `NODE_ROLE`.
+
+## Как работает запись
+
+Клиент отправляет запись на master:
+
+```http
+POST /data
+```
+
+Master сохраняет значение у себя и отправляет его на каждую реплику через внутренний эндпоинт:
+
+```http
+POST /replica/data
+```
+
+Если реплика недоступна, master продолжает работу, но эта реплика пропускает запись. Автоматической догрузки пропущенных данных здесь нет.
 
 ## Эндпоинты
 
-### Master
-- `POST /data`
-  - Запись данных на master и попытка репликации на все replica.
-  - Вход: JSON `{ "key": "name", "value": "Alice" }`
-  - Также поддерживаются query-параметры: `?key=name&value=Alice`
-- `GET /data/<key>`
-  - Получение значения по ключу.
+### `GET /health`
 
-### Replica
-- `POST /replica/data`
-  - Получение реплицируемых данных от master.
-  - Вход: JSON `{ "key": "name", "value": "Alice" }`
-- `GET /data/<key>`
-  - Получение значения по ключу.
+Проверяет состояние любого узла.
 
-### Вспомогательный
-- `GET /health` на любом узле
+### `POST /data`
+
+Записывает данные через master.
+
+Можно передать JSON:
+
+```json
+{
+  "key": "name",
+  "value": "Alice"
+}
+```
+
+Или query-параметры:
+
+```text
+/data?key=name&value=Alice
+```
+
+### `POST /replica/data`
+
+Внутренний эндпоинт реплики. Master вызывает его при репликации.
+
+### `GET /data/<key>`
+
+Возвращает значение по ключу на конкретном узле.
 
 ## Запуск
+
+Из папки `lab_3`:
+
 ```bash
 docker compose up --build -d
 ```
 
-Проверка здоровья:
+## Проверка health
+
 ```powershell
 Invoke-RestMethod -Method Get -Uri "http://localhost:8080/health"
 Invoke-RestMethod -Method Get -Uri "http://localhost:8081/health"
 Invoke-RestMethod -Method Get -Uri "http://localhost:8082/health"
 ```
 
-## Задание 1: простая репликация
+## Сценарий 1: обычная репликация
 
-1. Записать данные через master:
+Запишите данные через master:
+
 ```powershell
 Invoke-RestMethod -Method Post -Uri "http://localhost:8080/data?key=name&value=Alice"
 ```
 
-2. Прочитать на master и репликах:
+Проверьте значение на всех узлах:
+
 ```powershell
 Invoke-RestMethod -Method Get -Uri "http://localhost:8080/data/name"
 Invoke-RestMethod -Method Get -Uri "http://localhost:8081/data/name"
 Invoke-RestMethod -Method Get -Uri "http://localhost:8082/data/name"
 ```
 
-Ожидаемо: значение `Alice` есть на всех трех узлах.
+Ожидаемый результат: значение `Alice` есть на master и на обеих репликах.
 
-## Задание 2: имитация сбоя
+## Сценарий 2: сбой реплики
 
-1. Отключить одну replica:
+Остановите одну реплику:
+
 ```bash
 docker compose stop replica1
 ```
 
-2. Выполнить запись через master, пока `replica1` отключена:
+Запишите новое значение через master:
+
 ```powershell
 Invoke-RestMethod -Method Post -Uri "http://localhost:8080/data?key=city&value=Moscow"
 ```
 
-3. Проверить данные:
+Проверьте master и работающую реплику:
+
 ```powershell
 Invoke-RestMethod -Method Get -Uri "http://localhost:8080/data/city"
 Invoke-RestMethod -Method Get -Uri "http://localhost:8082/data/city"
 ```
 
-4. Включить `replica1` обратно:
+Верните `replica1`:
+
 ```bash
 docker compose start replica1
 ```
 
-5. Сравнить состояние после восстановления:
+Проверьте ее состояние:
+
 ```powershell
 Invoke-RestMethod -Method Get -Uri "http://localhost:8081/data/city"
-Invoke-RestMethod -Method Get -Uri "http://localhost:8082/data/city"
-Invoke-RestMethod -Method Get -Uri "http://localhost:8080/data/city"
 ```
 
-Ожидаемо:
-- `master` и активная во время записи `replica2` содержат ключ `city`.
-- восстановленная `replica1` может не содержать `city` (404), потому что пропустила запись во время простоя.
-- так как данные в памяти, после `stop/start` у `replica1` также теряются ранее полученные ключи (например, `name`), пока они снова не будут реплицированы.
-- это демонстрирует возможное расхождение данных между узлами при сбое.
+Ожидаемый результат: `replica1` может не знать про `city`, потому что во время записи была выключена. Так демонстрируется рассинхронизация данных.
 
 ## Логи
+
 ```bash
 docker compose logs -f
 ```
 
 ## Остановка
+
 ```bash
 docker compose down
 ```
+
+## Итог
+
+Лабораторная показывает базовую идею репликации и важную проблему распределенных систем: если узел был недоступен, он может отстать от остальных и потребовать отдельного механизма восстановления.
