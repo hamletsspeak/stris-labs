@@ -50,6 +50,10 @@ def write_data_master() -> Any:
     if NODE_ROLE != "master":
         return jsonify({"error": "Endpoint /data for write is available only on master"}), 405
 
+    mode = request.args.get("mode", "sync").strip().lower()
+    if mode != "sync":
+        return jsonify({"error": "Only mode=sync is supported"}), 400
+
     try:
         key, value = extract_payload()
     except ValueError as exc:
@@ -86,6 +90,7 @@ def write_data_master() -> Any:
         {
             "node": NODE_NAME,
             "role": NODE_ROLE,
+            "mode": mode,
             "stored": {"key": key, "value": value},
             "replication": replication_report,
         }

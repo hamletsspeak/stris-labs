@@ -8,9 +8,9 @@
 
 ## Что запускается
 
-- `lab3-master` - master-узел, доступен на `localhost:8080`.
-- `lab3-replica1` - первая реплика, доступна на `localhost:8081`.
-- `lab3-replica2` - вторая реплика, доступна на `localhost:8082`.
+- `lab3-master` - master-узел, доступен на `localhost:8300`.
+- `lab3-replica1` - первая реплика, доступна на `localhost:8301`.
+- `lab3-replica2` - вторая реплика, доступна на `localhost:8302`.
 
 Все три контейнера запускают один и тот же Flask-код. Роль узла задается переменной окружения `NODE_ROLE`.
 
@@ -19,7 +19,7 @@
 Клиент отправляет запись на master:
 
 ```http
-POST /data
+POST /data?mode=sync
 ```
 
 Master сохраняет значение у себя и отправляет его на каждую реплику через внутренний эндпоинт:
@@ -52,7 +52,7 @@ POST /replica/data
 Или query-параметры:
 
 ```text
-/data?key=name&value=Alice
+/data?mode=sync&key=name&value=Alice
 ```
 
 ### `POST /replica/data`
@@ -74,9 +74,9 @@ docker compose up --build -d
 ## Проверка health
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri "http://localhost:8080/health"
-Invoke-RestMethod -Method Get -Uri "http://localhost:8081/health"
-Invoke-RestMethod -Method Get -Uri "http://localhost:8082/health"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8300/health"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8301/health"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8302/health"
 ```
 
 ## Сценарий 1: обычная репликация
@@ -84,15 +84,15 @@ Invoke-RestMethod -Method Get -Uri "http://localhost:8082/health"
 Запишите данные через master:
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri "http://localhost:8080/data?key=name&value=Alice"
+Invoke-RestMethod -Method Post -Uri "http://localhost:8300/data?mode=sync&key=name&value=Alice"
 ```
 
 Проверьте значение на всех узлах:
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri "http://localhost:8080/data/name"
-Invoke-RestMethod -Method Get -Uri "http://localhost:8081/data/name"
-Invoke-RestMethod -Method Get -Uri "http://localhost:8082/data/name"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8300/data/name"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8301/data/name"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8302/data/name"
 ```
 
 Ожидаемый результат: значение `Alice` есть на master и на обеих репликах.
@@ -108,14 +108,14 @@ docker compose stop replica1
 Запишите новое значение через master:
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri "http://localhost:8080/data?key=city&value=Moscow"
+Invoke-RestMethod -Method Post -Uri "http://localhost:8300/data?mode=sync&key=city&value=Moscow"
 ```
 
 Проверьте master и работающую реплику:
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri "http://localhost:8080/data/city"
-Invoke-RestMethod -Method Get -Uri "http://localhost:8082/data/city"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8300/data/city"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8302/data/city"
 ```
 
 Верните `replica1`:
@@ -127,7 +127,7 @@ docker compose start replica1
 Проверьте ее состояние:
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri "http://localhost:8081/data/city"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8301/data/city"
 ```
 
 Ожидаемый результат: `replica1` может не знать про `city`, потому что во время записи была выключена. Так демонстрируется рассинхронизация данных.

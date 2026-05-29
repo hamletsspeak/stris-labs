@@ -8,7 +8,7 @@ services:
       PORT: "8080"
       REPLICA_URLS: http://replica1:8080,http://replica2:8080
     ports:
-      - "8080:8080"
+      - "8300:8080"
 
   replica1:
     build: ./app
@@ -18,7 +18,7 @@ services:
       NODE_NAME: replica1
       PORT: "8080"
     ports:
-      - "8081:8080"
+      - "8301:8080"
 
   replica2:
     build: ./app
@@ -28,4 +28,4 @@ services:
       NODE_NAME: replica2
       PORT: "8080"
     ports:
-      - "8082:8080"
+      - "8302:8080"

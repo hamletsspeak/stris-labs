@@ -1,144 +1,120 @@
 # Лабораторная работа 6
 
-## Архитектурные и инфраструктурные паттерны web-систем
+Проектирование web-системы с паттернами:
 
-В этой лабораторной работе реализован небольшой marketplace-сценарий: пользователь создает заказ, заказ попадает в очередь, worker пытается провести оплату, а статус заказа можно читать разными способами.
+- трехзвенная архитектура;
+- Service Discovery, Heartbeat, PubSub;
+- CQRS, очередь команд, асинхронная обработка;
+- надежность: retries, backoff, circuit breaker, idempotency, backpressure;
+- способы получения статуса: polling, long polling, streaming.
 
-Цель - показать, как в одной системе применяются gateway, service discovery, CQRS, очередь, retries, circuit breaker, idempotency, backpressure, cache и разные способы получения статуса.
+## Пояснение по выполнению задания
 
-## Что запускается
+### 1. Архитектура
 
-- `postgres` - основная база заказов.
-- `redis` - read model, cache, stream и pub/sub.
-- `discovery` - сервис регистрации и поиска сервисов, доступен на `localhost:8560`.
-- `order` - сервис заказов, доступен на `localhost:8061`.
-- `payment` - сервис оплаты, доступен на `localhost:8062`.
-- `gateway` - основная точка входа API, доступна на `localhost:8060`.
-- `worker` - фоновый обработчик заказов.
-- `notifier` - подписчик на события Redis Pub/Sub.
+Использована трехзвенная модель:
 
-## Как работает сценарий
+- `Client`: web/mobile клиент;
+- `Backend`: API Gateway и прикладные сервисы;
+- `Database`: PostgreSQL и Redis.
 
-1. Клиент отправляет запрос на gateway: `POST /api/orders`.
-2. Gateway находит сервис `order` через discovery.
-3. Order-сервис создает заказ в PostgreSQL.
-4. Для чтения создается проекция заказа в Redis.
-5. Команда обработки заказа кладется в Redis Stream `orders:commands`.
-6. Worker читает команду из stream и вызывает `payment`.
-7. Если оплата успешна, заказ получает статус `PAID`.
-8. Если есть временные ошибки, worker повторяет попытки с backoff.
-9. Если circuit breaker открыт, заказ переводится в `REVIEW`.
-10. Notifier получает события через Redis Pub/Sub и пишет их в логи.
+Тип клиента: **тонкий**. Бизнес-логика сосредоточена на backend, что упрощает контроль версий и безопасность.
 
-## Паттерны в работе
+### 2. Взаимодействие сервисов
 
-- **API Gateway** - клиент обращается к одному сервису `gateway`.
-- **Service Discovery** - сервисы регистрируются и отправляют heartbeat.
-- **CQRS** - запись хранится в PostgreSQL, read model хранится в Redis.
-- **Queue / Stream** - обработка заказа выполняется асинхронно через Redis Stream.
-- **Pub/Sub** - события публикуются в Redis channel `events`.
-- **Idempotency** - повторный запрос с тем же `Idempotency-Key` не создает новый заказ.
-- **Retries + Backoff** - worker повторяет оплату с увеличением задержки.
-- **Circuit Breaker** - при серии ошибок вызовы к payment временно блокируются.
-- **Fallback** - при проблемах заказ уходит в статус `REVIEW`.
-- **Graceful Degradation** - если Redis недоступен, чтение может идти из PostgreSQL.
-- **Backpressure** - при слишком большой очереди сервис возвращает `429`.
-- **ETag** - чтение заказа поддерживает условные GET-запросы.
+- `Pub/Sub`: события статуса заказа и уведомления;
+- `Service Discovery`: поиск актуальных адресов сервисов;
+- `Heartbeat`: периодическое подтверждение живости инстансов.
 
-## Запуск
+### 3. Работа с данными
 
-Из папки `lab_6`:
+- `CQRS`: разделены write-модель (транзакционные данные) и read-модель (быстрые чтения);
+- `MapReduce` для аналитики: map заказов по дню, reduce сумм/количеств.
 
-```bash
-docker compose up --build
+### 4. Надежность
+
+Реализованные паттерны:
+
+- `Retries + Backoff` для временных ошибок;
+- `Idempotency` для безопасных повторов запросов;
+- `Circuit Breaker` для защиты от каскадных отказов;
+- `Backpressure` для контроля перегрузки.
+
+Обработка ошибок:
+
+- `Fallback` на альтернативный путь обработки;
+- `Graceful Degradation` со снижением функционала без полной остановки.
+
+### 5. Кэширование
+
+- версионирование кэша через версию/etag;
+- тегирование кэша по сущности или пользователю для точечной инвалидции.
+
+### 6. Асинхронность
+
+- очередь сообщений для фоновых операций;
+- отложенные задачи в worker-процессах.
+
+### 7. Получение данных
+
+- `Polling` для регулярной проверки;
+- `Long Polling` для уменьшения лишних запросов;
+- `Streaming` для near real-time обновлений.
+
+### 8. Деплой
+
+Описаны стратегии:
+
+- `Rolling Release` — поэтапное обновление инстансов;
+- `Blue/Green` — переключение между двумя окружениями;
+- `Canary Release` — выпуск новой версии на долю трафика.
+
+## Краткие ответы
+
+- Паттерны выбраны для разделения ответственности, устойчивости и масштабируемости.
+- Отказоустойчивость обеспечивается комбинацией retry/backoff, breaker, fallback и backpressure.
+- Масштабирование достигается горизонтальным ростом сервисов, разделением read/write и выделением асинхронных worker-ов.
+
+## Диаграмма Mermaid
+
+Название: `Контейнерная диаграмма web-системы с отказоустойчивыми паттернами`
+
+```mermaid
+flowchart LR
+    CL["Тонкий клиент"]
+    GW["API Gateway"]
+    DISC["Service Discovery"]
+    ORD["Order Service"]
+    PAY["Payment Service"]
+    WRK["Worker"]
+    NTF["Notifier"]
+    PG["PostgreSQL модель записи"]
+    RD["Redis модель чтения и кэш"]
+    Q["Очередь команд"]
+
+    CL --> GW
+    GW --> DISC
+    GW --> ORD
+    DISC --> ORD
+    DISC --> PAY
+
+    ORD --> PG
+    ORD --> RD
+    ORD --> Q
+
+    WRK --> Q
+    WRK --> PAY
+    WRK --> PG
+    WRK --> RD
+    RD --> NTF
+
+    CB["Circuit Breaker"]
+    RT["Повторы и backoff"]
+    BP["Backpressure"]
+    ID["Идемпотентность"]
+
+    WRK -.-> CB
+    WRK -.-> RT
+    ORD -.-> BP
+    ORD -.-> ID
 ```
-
-Основной адрес API:
-
-```text
-http://localhost:8060
-```
-
-## Минимальная проверка
-
-Создать заказ:
-
-```powershell
-Invoke-RestMethod -Method Post -Uri "http://localhost:8060/api/orders" `
-  -ContentType "application/json" `
-  -Headers @{ "Idempotency-Key" = "demo-001" } `
-  -Body '{"user_id": 101, "amount": 1200.50}'
-```
-
-В ответе будет `order_id`. Его нужно подставить в следующие запросы.
-
-Проверить заказ:
-
-```powershell
-Invoke-RestMethod -Method Get -Uri "http://localhost:8060/api/orders/<ORDER_ID>"
-```
-
-Проверить статус через polling:
-
-```powershell
-Invoke-RestMethod -Method Get -Uri "http://localhost:8060/api/orders/<ORDER_ID>/status"
-```
-
-Проверить long polling:
-
-```powershell
-Invoke-RestMethod -Method Get -Uri "http://localhost:8060/api/orders/<ORDER_ID>/status/long-poll?current_status=PENDING&timeout_seconds=20"
-```
-
-Проверить SSE streaming:
-
-```powershell
-Invoke-WebRequest -Uri "http://localhost:8060/api/orders/<ORDER_ID>/status/stream"
-```
-
-Проверить service discovery:
-
-```powershell
-Invoke-RestMethod -Method Get -Uri "http://localhost:8560/services"
-```
-
-Посмотреть события:
-
-```bash
-docker compose logs -f notifier
-```
-
-## Полезные эндпоинты
-
-Gateway:
-
-- `POST /api/orders` - создать заказ;
-- `GET /api/orders/{order_id}` - получить заказ;
-- `GET /api/orders/{order_id}/status` - обычный polling;
-- `GET /api/orders/{order_id}/status/long-poll` - long polling;
-- `GET /api/orders/{order_id}/status/stream` - SSE stream.
-
-Discovery:
-
-- `GET /services` - список зарегистрированных сервисов;
-- `GET /resolve/{service}` - адрес конкретного сервиса.
-
-Order:
-
-- `GET /analytics/daily` - простая daily-аналитика по заказам.
-
-## Остановка
-
-```bash
-docker compose down
-```
-
-Удалить данные:
-
-```bash
-docker compose down -v
-```
-
-## Итог
-
-Лабораторная показывает, как строится более реалистичная web-система: запросы проходят через gateway, сервисы обнаруживают друг друга через discovery, запись и чтение разделены, тяжелая обработка уходит в очередь, а сбои обрабатываются контролируемо.
