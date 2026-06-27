@@ -36,6 +36,10 @@ POST /replica/data
 
 Проверяет состояние любого узла.
 
+### `POST /reset`
+
+Очищает in-memory данные на конкретном узле. Нужен для повторяемых экспериментов.
+
 ### `POST /data`
 
 Записывает данные через master.
@@ -99,23 +103,31 @@ Invoke-RestMethod -Method Get -Uri "http://localhost:8302/data/name"
 
 ## Сценарий 2: сбой реплики
 
+Для чистого эксперимента сначала очистите состояние всех узлов:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://localhost:8300/reset"
+Invoke-RestMethod -Method Post -Uri "http://localhost:8301/reset"
+Invoke-RestMethod -Method Post -Uri "http://localhost:8302/reset"
+```
+
 Остановите одну реплику:
 
 ```bash
 docker compose stop replica1
 ```
 
-Запишите новое значение через master:
+Запишите новое значение через master (используйте уникальный ключ, чтобы не попасть в данные от прошлого запуска):
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri "http://localhost:8300/data?mode=sync&key=city&value=Moscow"
+Invoke-RestMethod -Method Post -Uri "http://localhost:8300/data?mode=sync&key=city_1&value=Moscow"
 ```
 
 Проверьте master и работающую реплику:
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri "http://localhost:8300/data/city"
-Invoke-RestMethod -Method Get -Uri "http://localhost:8302/data/city"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8300/data/city_1"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8302/data/city_1"
 ```
 
 Верните `replica1`:
@@ -127,10 +139,10 @@ docker compose start replica1
 Проверьте ее состояние:
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri "http://localhost:8301/data/city"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8301/data/city_1"
 ```
 
-Ожидаемый результат: `replica1` может не знать про `city`, потому что во время записи была выключена. Так демонстрируется рассинхронизация данных.
+Ожидаемый результат: `replica1` не знает про `city_1` (404), потому что во время записи была выключена. Так демонстрируется рассинхронизация данных.
 
 ## Логи
 

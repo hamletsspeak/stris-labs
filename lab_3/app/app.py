@@ -45,6 +45,20 @@ def health() -> Any:
     )
 
 
+@app.post("/reset")
+def reset_data() -> Any:
+    # Utility endpoint for deterministic lab reruns.
+    storage.clear()
+    return jsonify(
+        {
+            "node": NODE_NAME,
+            "role": NODE_ROLE,
+            "status": "cleared",
+            "keys": len(storage),
+        }
+    )
+
+
 @app.post("/data")
 def write_data_master() -> Any:
     if NODE_ROLE != "master":
